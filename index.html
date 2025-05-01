@@ -1,0 +1,55 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CrowdTest - Crowdtesting Platform</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-container">
+      <div class="logo"><h1>CrowdTest</h1></div>
+      <div class="nav-links">
+        <button class="nav-link" onclick="localStorage.setItem('pendingPage', 'login'); window.location.href='app.html'">Login</button>
+<button class="nav-link btn-primary" onclick="localStorage.setItem('pendingPage', 'register'); window.location.href='app.html'">Sign Up</button>
+
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Welcome to CrowdTest</h2>
+      <p>CrowdTest is a modern crowdtesting platform where developers connect with a global community of testers to improve the quality of their software. Our mission is to make testing accessible, effective, and truly real-world.</p>
+    </section>
+
+    <section class="card">
+      <h3>🌍 Global Testing Reach</h3>
+      <p>Receive bug reports from real users across different devices, locations, and conditions. CrowdTest lets your project be tested like it’s used in the real world.</p>
+      <img src="global-testers.png" alt="Global Testers" style="width:100%; margin-top: 20px; border-radius: 10px;" />
+    </section>
+
+    <section class="card">
+      <h3>🧪 Test Across All Devices</h3>
+      <p>From mobile apps to desktop tools and web platforms, CrowdTest supports multi-device testing by non-technical users and testers with real devices.</p>
+      <img src="multi-device-testing.png" alt="Multi-Device Testing" style="width:100%; margin-top: 20px; border-radius: 10px;" />
+    </section>
+
+    <section class="card">
+      <h3>🚀 Get Started Now</h3>
+      <p>Whether you're a developer or someone who enjoys testing apps, CrowdTest welcomes you to join and collaborate. Help shape better software, together!</p>
+      <div class="role-selector" style="margin-top: 20px;">
+        <button class="btn btn-primary" onclick="localStorage.setItem('pendingPage', 'register'); window.location.href='app.html'">I'm a Developer</button>
+        <button class="btn btn-secondary" onclick="localStorage.setItem('pendingPage', 'register'); window.location.href='app.html'">I'm a Tester</button>
+        
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2025 CrowdTest. All rights reserved.</p>
+  </footer>
+</body>
+</html>

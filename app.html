@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CrowdTest Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+  <!-- Firebase SDKs -->
+  <!-- Firebase Compat SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+<!-- Your Firebase Config & API -->
+<script src="firebase-config.js"></script>
+<script src="api.js"></script>
+
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Inline React App -->
+  <script type="text/babel">
+    function Navbar({ currentPage, userRole, onNavigate }) {
+  const handleLogout = () => {
+    onNavigate('login');
+  };
+
+  return (
+    <header className="navbar">
+      <div className="container navbar-container">
+        <div className="logo">
+          <h1>CrowdTest</h1>
+        </div>
+        <nav className="nav-links">
+          {userRole ? (
+            <React.Fragment>
+              <button 
+                className="nav-link" 
+                onClick={() => onNavigate(userRole === 'developer' ? 'developerDashboard' : 'testerDashboard')}
+              >
+                Dashboard
+              </button>
+              {userRole === 'developer' && (
+                <button 
+                  className="nav-link" 
+                  onClick={() => onNavigate('projectForm')}
+                >
+                  Submit Project
+                </button>
+              )}
+              {userRole === 'tester' && (
+                <button 
+                  className="nav-link" 
+                  onClick={() => onNavigate('bugForm')}
+                >
+                  Report Bug
+                </button>
+              )}
+              <button 
+                className="nav-link logout" 
+                onClick={handleLogout}
+              >
+                Log Out
+              </button>
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <button 
+                className={`nav-link ${currentPage === 'login' ? 'active' : ''}`} 
+                onClick={() => onNavigate('login')}
+              >
+                Login
+              </button>
+              <button 
+                className={`nav-link ${currentPage === 'register' ? 'active' : ''}`} 
+                onClick={() => onNavigate('register')}
+              >
+                Register
+              </button>
+            </React.Fragment>
+          )}
+        </nav>
+      </div>
+    </header>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="footer">
+      <div className="container">
+        <p>&copy; {new Date().getFullYear()} CrowdTest Platform. All rights reserved.</p>
+      </div>
+    </footer>
+  );
+}
+
+// Auth Components
+function Login({ onLogin }) {
+  const [formData, setFormData] = React.useState({
+    email: '',
+    password: '',
+    role: 'developer'
+  });
+  const [error, setError] = React.useState('');
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      // Attempt to login
+      const user = await API.auth.login(formData.email, formData.password, formData.role);
+      onLogin(formData.role);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div className="auth-container card">
+      <h2>Login to CrowdTest</h2>
+      {error && <div className="error-message">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label className="form-label">Email</label>
+          <input
+            type="email"
+            name="email"
+            className="form-control"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Password</label>
+          <input
+            type="password"
+            name="password"
+            className="form-control"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">I am a:</label>
+          <div className="role-selector">
+            <label>
+              <input
+                type="radio"
+                name="role"
+                value="developer"
+                checked={formData.role === 'developer'}
+                onChange={handleChange}
+              />
+              Developer
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="role"
+                value="tester"
+                checked={formData.role === 'tester'}
+                onChange={handleChange}
+              />
+              Tester
+            </label>
+          </div>
+        </div>
+        <button type="submit" className="btn btn-primary">Login</button>
+      </form>
+    </div>
+  );
+}
+function Register({ onRegister }) {
+  const [formData, setFormData] = React.useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    role: 'developer'
+  });
+  const [error, setError] = React.useState('');
+  const [success, setSuccess] = React.useState('');
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    
+    // Validate password match
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    try {
+      await API.auth.register(formData.name, formData.email, formData.password, formData.role);
+      setSuccess('Registration successful! You can now login.');
+      setTimeout(() => onRegister(), 2000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div className="auth-container card">
+      <h2>Register for CrowdTest</h2>
+      {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">{success}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label className="form-label">Full Name</label>
+          <input
+            type="text"
+            name="name"
+            className="form-control"
+            value={formData.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Email</label>
+          <input
+            type="email"
+            name="email"
+            className="form-control"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Password</label>
+          <input
+            type="password"
+            name="password"
+            className="form-control"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Confirm Password</label>
+          <input
+            type="password"
+            name="confirmPassword"
+            className="form-control"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">I am a:</label>
+          <div className="role-selector">
+            <label>
+              <input
+                type="radio"
+                name="role"
+                value="developer"
+                checked={formData.role === 'developer'}
+                onChange={handleChange}
+              />
+              Developer
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="role"
+                value="tester"
+                checked={formData.role === 'tester'}
+                onChange={handleChange}
+              />
+              Tester
+            </label>
+          </div>
+        </div>
+        <button type="submit" className="btn btn-primary">Register</button>
+      </form>
+    </div>
+  );
+}
+// Dashboard Components
+function DeveloperDashboard({ onSubmitProject }) {
+  const [activeTab, setActiveTab] = React.useState('projects');
+  const [projects, setProjects] = React.useState([]);
+  const [bugs, setBugs] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch projects
+        const projectsData = await API.projects.getProjects();
+        setProjects(projectsData);
+        
+        // Fetch bugs
+        const bugsData = await API.bugs.getDeveloperBugs();
+        setBugs(bugsData);
+      } catch (err) {
+        setError('Failed to load data: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
+
+  return (
+    <div className="dashboard">
+      <div className="dashboard-header">
+        <h2>Developer Dashboard</h2>
+        <button className="btn btn-primary" onClick={onSubmitProject}>Submit New Project</button>
+      </div>
+      
+      {error && <div className="error-message">{error}</div>}
+      
+      <div className="tab-buttons">
+        <button 
+          className={`tab-btn ${activeTab === 'projects' ? 'active' : ''}`}
+          onClick={() => setActiveTab('projects')}
+        >
+          My Projects
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'bugs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('bugs')}
+        >
+          Bug Reports
+        </button>
+      </div>
+      
+      {loading ? (
+        <div className="loading">Loading data...</div>
+      ) : activeTab === 'projects' ? (
+        <div className="project-grid">
+          {projects.length === 0 ? (
+            <p>No projects found. Submit your first project!</p>
+          ) : (
+            projects.map(project => (
+              <div className="card" key={project.id}>
+                <h3>{project.name}</h3>
+                <p>Status: {project.status}</p>
+                <p>Open Bugs: {project.bugs}</p>
+                <button className="btn btn-secondary">View Details</button>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="bug-grid">
+          {bugs.length === 0 ? (
+            <p>No bugs reported yet.</p>
+          ) : (
+            bugs.map(bug => (
+              <div className="card" key={bug.id}>
+                <h3>{bug.title}</h3>
+                <p>Project: {bug.projectName}</p>
+                <p>Status: {bug.status}</p>
+                <span className={`badge badge-${bug.severity}`}>
+                  {bug.severity}
+                </span>
+                <div style={{ marginTop: '10px' }}>
+                  <button className="btn btn-secondary">View Details</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+function TesterDashboard({ onReportBug }) {
+  const [activeTab, setActiveTab] = React.useState('available');
+  const [availableProjects, setAvailableProjects] = React.useState([]);
+  const [myBugs, setMyBugs] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch available projects
+        const projectsData = await API.projects.getAvailableProjects();
+        setAvailableProjects(projectsData);
+        
+        // Fetch bugs reported by this tester
+        const bugsData = await API.bugs.getTesterBugs();
+        setMyBugs(bugsData);
+      } catch (err) {
+        setError('Failed to load data: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
+
+  return (
+    <div className="dashboard">
+      <div className="dashboard-header">
+        <h2>Tester Dashboard</h2>
+        <button className="btn btn-primary" onClick={onReportBug}>Report a Bug</button>
+      </div>
+      
+      {error && <div className="error-message">{error}</div>}
+      
+      <div className="tab-buttons">
+        <button 
+          className={`tab-btn ${activeTab === 'available' ? 'active' : ''}`}
+          onClick={() => setActiveTab('available')}
+        >
+          Available Projects
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'mybugs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('mybugs')}
+        >
+          My Bug Reports
+        </button>
+      </div>
+      
+      {loading ? (
+        <div className="loading">Loading data...</div>
+      ) : activeTab === 'available' ? (
+        <div className="project-grid">
+          {availableProjects.length === 0 ? (
+            <p>No projects available for testing at the moment.</p>
+          ) : (
+            availableProjects.map(project => (
+              <div className="card" key={project.id}>
+                <h3>{project.name}</h3>
+                <p>Developer: {project.developerName}</p>
+                <p>Created: {new Date(project.createdAt).toLocaleDateString()}</p>
+                <button className="btn btn-secondary">View Project</button>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="bug-grid">
+          {myBugs.length === 0 ? (
+            <p>You haven't reported any bugs yet.</p>
+          ) : (
+            myBugs.map(bug => (
+              <div className="card" key={bug.id}>
+                <h3>{bug.title}</h3>
+                <p>Project: {bug.projectName}</p>
+                <p>Status: {bug.status}</p>
+                <span className={`badge badge-${bug.severity}`}>
+                  {bug.severity}
+                </span>
+                <div style={{ marginTop: '10px' }}>
+                  <button className="btn btn-secondary">View Details</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Form Components
+function BugForm({ onSubmit }) {
+  const [formData, setFormData] = React.useState({
+    projectId: '',
+    title: '',
+    description: '',
+    stepsToReproduce: '',
+    severity: 'medium',
+    deviceInfo: ''
+  });
+  const [projects, setProjects] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setLoading(true);
+        const data = await API.projects.getAvailableProjects();
+        setProjects(data);
+      } catch (err) {
+        setError('Failed to load projects: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProjects();
+  }, []);
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    
+    try {
+      await API.bugs.reportBug(formData);
+      alert('Bug reported successfully!');
+      onSubmit();
+    } catch (err) {
+      setError('Failed to submit bug report: ' + err.message);
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) return <div className="loading">Loading projects...</div>;
+
+  return (
+    <div className="card">
+      <h2>Report a Bug</h2>
+      {error && <div className="error-message">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label className="form-label">Project</label>
+          <select
+            name="projectId"
+            className="form-control"
+            value={formData.projectId}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select a project</option>
+            {projects.map(project => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Bug Title</label>
+          <input
+            type="text"
+            name="title"
+            className="form-control"
+            value={formData.title}
+            onChange={handleChange}
+            placeholder="Brief description of the bug"
+            required
+          />
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Description</label>
+          <textarea
+            name="description"
+            className="form-control"
+            value={formData.description}
+            onChange={handleChange}
+            rows="4"
+            placeholder="Detailed description of the bug"
+            required
+          ></textarea>
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Steps to Reproduce</label>
+          <textarea
+            name="stepsToReproduce"
+            className="form-control"
+            value={formData.stepsToReproduce}
+            onChange={handleChange}
+            rows="4"
+            placeholder="1. First step&#10;2. Second step&#10;3. ..."
+            required
+          ></textarea>
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Severity</label>
+          <select
+            name="severity"
+            className="form-control"
+            value={formData.severity}
+            onChange={handleChange}
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Device Information</label>
+          <input
+            type="text"
+            name="deviceInfo"
+            className="form-control"
+            value={formData.deviceInfo}
+            onChange={handleChange}
+            placeholder="OS, Browser, Device model, etc."
+          />
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Screenshot (Optional)</label>
+          <input
+            type="file"
+            name="screenshot"
+            className="form-control"
+            accept="image/*"
+          />
+          <small>Note: File upload functionality is not fully implemented in this version</small>
+        </div>
+        
+        <div>
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={submitting}
+          >
+            {submitting ? 'Submitting...' : 'Submit Bug Report'}
+          </button>
+          <button 
+            type="button" 
+            className="btn" 
+            onClick={onSubmit}
+            disabled={submitting}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ProjectForm({ onSubmit }) {
+  const [formData, setFormData] = React.useState({
+    name: '',
+    description: '',
+    codeType: 'file',
+    codeText: '',
+    instructions: ''
+  });
+  const [error, setError] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+  const fileInputRef = React.useRef(null);
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    
+    try {
+      // Create the project data object
+      const projectData = {
+        name: formData.name,
+        description: formData.description,
+        instructions: formData.instructions
+      };
+      
+      // Add code text if that option was selected
+      if (formData.codeType === 'text') {
+        projectData.codeText = formData.codeText;
+      } else {
+        // In a real implementation, we'd handle file upload here
+        // For now, we'll just check if a file was selected
+        const fileInput = fileInputRef.current;
+        if (fileInput && fileInput.files.length === 0) {
+          throw new Error('Please select a code file to upload');
+        }
+        // For this demo, we'll just use the filename
+        if (fileInput && fileInput.files.length > 0) {
+          projectData.codeText = `File: ${fileInput.files[0].name} (file content would be processed in production)`;
+        }
+      }
+      
+      await API.projects.createProject(projectData);
+      alert('Project submitted successfully!');
+      onSubmit();
+    } catch (err) {
+      setError('Failed to submit project: ' + err.message);
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2>Submit New Project</h2>
+      {error && <div className="error-message">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label className="form-label">Project Name</label>
+          <input
+            type="text"
+            name="name"
+            className="form-control"
+            value={formData.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Project Description</label>
+          <textarea
+            name="description"
+            className="form-control"
+            value={formData.description}
+            onChange={handleChange}
+            rows="3"
+            required
+          ></textarea>
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Code Submission Method</label>
+          <div>
+            <label>
+              <input
+                type="radio"
+                name="codeType"
+                value="file"
+                checked={formData.codeType === 'file'}
+                onChange={handleChange}
+              />
+              Upload File
+            </label>
+            <label style={{ marginLeft: '15px' }}>
+              <input
+                type="radio"
+                name="codeType"
+                value="text"
+                checked={formData.codeType === 'text'}
+                onChange={handleChange}
+              />
+              Text Input
+            </label>
+          </div>
+        </div>
+        
+        {formData.codeType === 'file' ? (
+          <div className="form-group">
+            <label className="form-label">Upload Code File</label>
+            <input
+              type="file"
+              name="codeFile"
+              className="form-control"
+              ref={fileInputRef}
+              accept=".js,.html,.css,.py,.java,.php,.json"
+            />
+            <small>Accepted file types: .js, .html, .css, .py, .java, .php, .json</small>
+          </div>
+        ) : (
+          <div className="form-group">
+            <label className="form-label">Enter Code</label>
+            <textarea
+              name="codeText"
+              className="form-control"
+              value={formData.codeText}
+              onChange={handleChange}
+              rows="8"
+              placeholder="Paste your code here..."
+            ></textarea>
+          </div>
+        )}
+        
+        <div className="form-group">
+          <label className="form-label">Testing Instructions</label>
+          <textarea
+            name="instructions"
+            className="form-control"
+            value={formData.instructions}
+            onChange={handleChange}
+            rows="4"
+            placeholder="Provide testers with information on how to test your code"
+            required
+          ></textarea>
+        </div>
+        
+        <div>
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={submitting}
+          >
+            {submitting ? 'Submitting...' : 'Submit Project'}
+          </button>
+          <button 
+            type="button" 
+            className="btn" 
+            onClick={onSubmit}
+            disabled={submitting}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+
+// Main App Component
+function App() {
+
+    const [currentPage, setCurrentPage] = React.useState(() => {
+  const pending = localStorage.getItem('pendingPage') || 'login';
+  localStorage.removeItem('pendingPage');
+  return pending;
+});
+
+  const [userRole, setUserRole] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+
+  
+  // Check if user is already logged in on page load
+  React.useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        // Get user data from token (in a real app, we would validate the token)
+        const userData = JSON.parse(atob(token.split('.')[1]));
+        setUserRole(userData.role);
+        setCurrentPage(userData.role === 'developer' ? 'developerDashboard' : 'testerDashboard');
+      } catch (error) {
+        // If token is invalid, clear it
+        localStorage.removeItem('token');
+      }
+    }
+    setLoading(false);
+  }, []);
+  
+  const handleNavigation = (page) => {
+    if (page === 'login') {
+      // Clear token on logout
+      localStorage.removeItem('token');
+      setUserRole('');
+    }
+    setCurrentPage(page);
+  }
+  
+  const handleLogin = (role) => {
+    setUserRole(role);
+    setCurrentPage(role === 'developer' ? 'developerDashboard' : 'testerDashboard');
+  }
+
+  if (loading) {
+    return <div className="loading-screen">Loading application...</div>;
+  }
+
+  const renderPage = () => {
+    switch(currentPage) {
+      case 'login':
+        return <Login onLogin={handleLogin} />;
+      case 'register':
+        return <Register onRegister={() => setCurrentPage('login')} />;
+      case 'developerDashboard':
+        return <DeveloperDashboard onSubmitProject={() => setCurrentPage('projectForm')} />;
+      case 'testerDashboard':
+        return <TesterDashboard onReportBug={() => setCurrentPage('bugForm')} />;
+      case 'bugForm':
+        return <BugForm onSubmit={() => setCurrentPage('testerDashboard')} />;
+      case 'projectForm':
+        return <ProjectForm onSubmit={() => setCurrentPage('developerDashboard')} />;
+      default:
+        return <Login onLogin={handleLogin} />;
+    }
+  }
+
+  return (
+    <div className="app">
+      <Navbar 
+        currentPage={currentPage} 
+        userRole={userRole} 
+        onNavigate={handleNavigation} 
+      />
+      <main className="container">
+        {renderPage()}
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+// Render the App
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+  </script>
+</body>
+</html>
